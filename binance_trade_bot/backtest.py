@@ -43,7 +43,8 @@ class MockBinanceManager(BinanceAPIManager):
         """
         Get ticker price of a specific coin
         """
-        target_date = self.datetime.strftime("%d %b %Y %H:%M:%S")
+        date_format = "%d %b %Y %H:%M:%S"
+        target_date = self.datetime.strftime(date_format)
         key = f"{ticker_symbol} - {target_date}"
         val = cache.get(key, None)
         if val is None:
@@ -52,10 +53,12 @@ class MockBinanceManager(BinanceAPIManager):
             end_date = self.datetime + timedelta(minutes=minutes)
             if end_date > datetime.now():
                 end_date = datetime.now()
-            end_date = end_date.strftime("%d %b %Y %H:%M:%S")
-            self.logger.info(f"Fetching prices for {ticker_symbol} between {self.datetime} and {end_date}")
+            end_date = end_date.strftime(date_format)
+            self.logger.info(
+                f"Fetching prices for {ticker_symbol} between {target_date} and {end_date}")
             for result in self.binance_client.get_historical_klines(ticker_symbol, "1m", target_date, end_date, limit=num_klines):
-                date = datetime.utcfromtimestamp(result[0] / minutes).strftime("%d %b %Y %H:%M:%S")
+                date = datetime.utcfromtimestamp(
+                    result[0] / minutes).strftime(date_format)
                 price = float(result[1])
                 cache[f"{ticker_symbol} - {date}"] = price
             cache.commit()
@@ -73,9 +76,14 @@ class MockBinanceManager(BinanceAPIManager):
         target_symbol = target_coin.symbol
 
         target_balance = self.get_currency_balance(target_symbol)
+        symbol_exists = self.check_symbol_exists(origin_symbol + target_symbol)
+        if symbol_exists:
+            return None
+
         from_coin_price = self.get_ticker_price(origin_symbol + target_symbol)
 
-        order_quantity = self._buy_quantity(origin_symbol, target_symbol, target_balance, from_coin_price)
+        order_quantity = self._buy_quantity(
+            origin_symbol, target_symbol, target_balance, from_coin_price)
         target_quantity = order_quantity * from_coin_price
         self.balances[target_symbol] -= target_quantity
         self.balances[origin_symbol] = self.balances.get(origin_symbol, 0) + order_quantity * (
@@ -86,7 +94,8 @@ class MockBinanceManager(BinanceAPIManager):
             f"{self.balances[target_symbol]}"
         )
 
-        event = defaultdict(lambda: None, order_price=from_coin_price, cumulative_quote_asset_transacted_quantity=0)
+        event = defaultdict(lambda: None, order_price=from_coin_price,
+                            cumulative_quote_asset_transacted_quantity=0)
 
         return BinanceOrder(event)
 
@@ -97,7 +106,8 @@ class MockBinanceManager(BinanceAPIManager):
         origin_balance = self.get_currency_balance(origin_symbol)
         from_coin_price = self.get_ticker_price(origin_symbol + target_symbol)
 
-        order_quantity = self._sell_quantity(origin_symbol, target_symbol, origin_balance)
+        order_quantity = self._sell_quantity(
+            origin_symbol, target_symbol, origin_balance)
         target_quantity = order_quantity * from_coin_price
         self.balances[target_symbol] = self.balances.get(target_symbol, 0) + target_quantity * (
             1 - self.get_fee(origin_coin, target_coin, True)
@@ -166,10 +176,13 @@ def backtest(
     db = MockDatabase(logger, config)
     db.create_database()
     db.set_coins(config.SUPPORTED_COIN_LIST)
-    manager = MockBinanceManager(config, db, logger, start_date, start_balances)
+    manager = MockBinanceManager(
+        config, db, logger, start_date, start_balances)
 
     starting_coin = db.get_coin(starting_coin or config.SUPPORTED_COIN_LIST[0])
-    if manager.get_currency_balance(starting_coin.symbol) == 0:
+    symbol_exists = manager.check_symbol_exists(
+        starting_coin.symbol + config.BRIDGE_SYMBOL)
+    if manager.get_currency_balance(starting_coin.symbol) == 0 and symbol_exists:
         manager.buy_alt(starting_coin, config.BRIDGE)
     db.set_current_coin(starting_coin)
 

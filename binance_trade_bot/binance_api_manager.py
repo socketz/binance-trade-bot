@@ -247,11 +247,16 @@ class BinanceAPIManager:
     def _buy_quantity(
         self, origin_symbol: str, target_symbol: str, target_balance: float = None, from_coin_price: float = None
     ):
-        target_balance = target_balance or self.get_currency_balance(target_symbol)
-        from_coin_price = from_coin_price or self.get_ticker_price(origin_symbol + target_symbol)
+        self.logger.debug(f'Get currency balance for {target_symbol}')
+        target_balance = target_balance if target_balance is not None else self.get_currency_balance(target_symbol)
+        self.logger.debug(f'Get ticker price for {origin_symbol + target_symbol}')
+        from_coin_price = from_coin_price if from_coin_price is not None else self.get_ticker_price(origin_symbol + target_symbol)
 
         origin_tick = self.get_alt_tick(origin_symbol, target_symbol)
-        return math.floor(target_balance * 10 ** origin_tick / from_coin_price) / float(10 ** origin_tick)
+        if origin_tick is not None and target_balance is not None and from_coin_price is not None:
+            return math.floor(target_balance * 10 ** origin_tick / from_coin_price) / float(10 ** origin_tick)
+        else:
+            return 0.0
 
     def _buy_alt(self, origin_coin: Coin, target_coin: Coin):
         """
