@@ -47,15 +47,15 @@ class MockBinanceManager(BinanceAPIManager):
         key = f"{ticker_symbol} - {target_date}"
         val = cache.get(key, None)
         if val is None:
-            end_date = self.datetime + timedelta(minutes=1000)
+            minutes = 1440
+            num_klines = 1000
+            end_date = self.datetime + timedelta(minutes=minutes)
             if end_date > datetime.now():
                 end_date = datetime.now()
             end_date = end_date.strftime("%d %b %Y %H:%M:%S")
             self.logger.info(f"Fetching prices for {ticker_symbol} between {self.datetime} and {end_date}")
-            for result in self.binance_client.get_historical_klines(
-                ticker_symbol, "1m", target_date, end_date, limit=1000
-            ):
-                date = datetime.utcfromtimestamp(result[0] / 1000).strftime("%d %b %Y %H:%M:%S")
+            for result in self.binance_client.get_historical_klines(ticker_symbol, "1m", target_date, end_date, limit=num_klines):
+                date = datetime.utcfromtimestamp(result[0] / minutes).strftime("%d %b %Y %H:%M:%S")
                 price = float(result[1])
                 cache[f"{ticker_symbol} - {date}"] = price
             cache.commit()
@@ -115,16 +115,17 @@ class MockBinanceManager(BinanceAPIManager):
             if coin == target_symbol:
                 total += balance
                 continue
-            if coin == self.config.BRIDGE.symbol:
-                price = self.get_ticker_price(target_symbol + coin)
-                if price is None:
-                    continue
-                total += balance / price
             else:
-                price = self.get_ticker_price(coin + target_symbol)
-                if price is None:
-                    continue
-                total += price * balance
+                if coin == self.config.BRIDGE.symbol:
+                    price = self.get_ticker_price(target_symbol + coin)
+                    if price is None:
+                        continue
+                    total += balance / price
+                else:
+                    price = self.get_ticker_price(coin + target_symbol)
+                    if price is None:
+                        continue
+                    total += price * balance
         return total
 
 

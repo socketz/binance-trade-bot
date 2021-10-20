@@ -83,6 +83,11 @@ class BinanceAPIManager:
         """
         Get ticker price of a specific coin
         """
+        symbol_exists = self.check_symbol_exists(ticker_symbol)
+        if not symbol_exists:
+            self.logger.info(f"Symbol does not exist: {ticker_symbol} - will not be fetched from now on")
+            return None
+
         price = self.cache.ticker_values.get(ticker_symbol, None)
         if price is None and ticker_symbol not in self.cache.non_existent_tickers:
             self.cache.ticker_values = {
@@ -137,6 +142,9 @@ class BinanceAPIManager:
             for _filter in self.binance_client.get_symbol_info(origin_symbol + target_symbol)["filters"]
             if _filter["filterType"] == filter_type
         )
+
+    def check_symbol_exists(self, symbol: str):
+        return self.binance_client.get_symbol_info(symbol) is not None
 
     @cached(cache=TTLCache(maxsize=2000, ttl=43200))
     def get_alt_tick(self, origin_symbol: str, target_symbol: str):
